@@ -160,8 +160,16 @@
         <div class="option-btn" data-value="Closing/Dealing">Closing/Dealing</div>
       </div>
 
+      <div class="conditional-field" id="estimasiField">
+        <label for="estimasiNilai">Estimasi Nilai Deal</label>
+        <div class="prefix-wrap">
+          <span>Rp</span>
+          <input type="text" id="estimasiNilai" placeholder="0" inputmode="numeric">
+        </div>
+      </div>
+
       <div class="conditional-field" id="dealField">
-        <label for="nominalDeal">Nominal Deal</label>
+        <label for="nominalDeal">Nominal Deal (Final)</label>
         <div class="prefix-wrap">
           <span>Rp</span>
           <input type="text" id="nominalDeal" placeholder="0" inputmode="numeric">
@@ -292,6 +300,7 @@
     state.tujuan = null;
     state.hasil = null;
     document.getElementById('dealField').classList.remove('show');
+    document.getElementById('estimasiField').classList.remove('show');
     document.getElementById('keteranganField').classList.remove('show');
     document.getElementById('keterangan').value = '';
     document.getElementById('projectFuField').style.display = 'none';
@@ -327,11 +336,20 @@
 
         if (key === 'hasil') {
           const dealField = document.getElementById('dealField');
+          const estimasiField = document.getElementById('estimasiField');
+
           if (btn.dataset.value === 'Closing/Dealing') {
             dealField.classList.add('show');
           } else {
             dealField.classList.remove('show');
             document.getElementById('nominalDeal').value = '';
+          }
+
+          if (btn.dataset.value === 'Lead' || btn.dataset.value === 'Coordinating') {
+            estimasiField.classList.add('show');
+          } else {
+            estimasiField.classList.remove('show');
+            document.getElementById('estimasiNilai').value = '';
           }
         }
       });
@@ -393,6 +411,9 @@
       fu: state.fu,
       nominalDeal: state.hasil === 'Closing/Dealing'
         ? document.getElementById('nominalDeal').value.trim()
+        : '',
+      estimasiNilai: (state.hasil === 'Lead' || state.hasil === 'Coordinating')
+        ? document.getElementById('estimasiNilai').value.trim()
         : ''
     };
 
