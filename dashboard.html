@@ -114,7 +114,7 @@
 <div class="wrap">
   <header>
     <h1>Dashboard Pipeline</h1>
-    <p class="subtitle">Data live dari Google Sheets</p>
+    <p class="subtitle">Data live dari Google Sheets &middot; auto-refresh tiap 1 menit</p>
     <a class="nav-link" href="index.html">&larr; Kembali ke Input Pipeline</a>
   </header>
 
@@ -132,29 +132,26 @@
   // GANTI dengan URL Web App Apps Script yang sama dengan landing page
   const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzyrJ35iubKPtiMY7GEWGy1klnJPaa_rH1sL1ntg9l3Zq8JjkLcMaK59g9chBHAocGY/exec';
 
-  const STAGE_ORDER = ['1st Meet', 'Lead', 'Coordinating', 'Closing/Dealing'];
+  const STAGE_ORDER = ['1st Meet', 'Lead', 'Coordinating', 'Closing/Dealing', 'Generate'];
 
   function formatRupiah(num) {
     return 'Rp ' + Math.round(num).toLocaleString('id-ID');
   }
 
-  function groupIntoDeals(rows) {
-    // satu "deal" = kombinasi klien + project. Ambil state terakhir (FU tertinggi) per deal.
-    const map = {};
-    rows.forEach(r => {
-      const key = r.klien + '||' + r.project;
-      if (!map[key] || r.fu > map[key].fu) {
-        map[key] = r;
-      }
-    });
-    return Object.values(map);
+  const VALID_STAGES = ['1st Meet', 'Lead', 'Coordinating', 'Closing/Dealing', 'Generate'];
+
+  function cleanRows(rows) {
+    // buang baris sampah/test yang tidak punya Hasil valid
+    return rows.filter(r => VALID_STAGES.includes(r.hasil));
   }
 
-  function renderFunnel(deals) {
+  const STAGE_LABELS = { 'Generate': 'Invoice Terbit' };
+
+  function renderFunnel(rows) {
     const counts = {};
     STAGE_ORDER.forEach(s => counts[s] = 0);
-    deals.forEach(d => {
-      if (counts.hasOwnProperty(d.hasil)) counts[d.hasil]++;
+    rows.forEach(r => {
+      if (counts.hasOwnProperty(r.hasil)) counts[r.hasil]++;
     });
     const max = Math.max(1, ...Object.values(counts));
 
@@ -162,9 +159,10 @@
     STAGE_ORDER.forEach(stage => {
       const val = counts[stage];
       const pct = Math.max(6, (val / max) * 100);
+      const label = STAGE_LABELS[stage] || stage;
       html += `
         <div class="funnel-row">
-          <div class="funnel-label">${stage}</div>
+          <div class="funnel-label">${label}</div>
           <div class="funnel-bar-track">
             <div class="funnel-bar-fill" style="width:${pct}%">
               <span>${val}</span>
@@ -184,40 +182,56 @@
     return Number(parts[1]); // 1-12
   }
 
-  function renderValueVsTarget(deals, allRows, targets) {
-    const closedDeals = deals.filter(d => d.hasil === 'Closing/Dealing');
+  function renderValueVsTarget(rows, targets) {
+    const closedRows = rows.filter(r => r.hasil === 'Closing/Dealing');
+    const invoiceRows = rows.filter(r => r.hasil === 'Generate');
 
-    const realized = closedDeals.reduce((sum, d) => sum + (d.nominalDeal || 0), 0);
+    const moSigned = closedRows.reduce((sum, r) => sum + (r.nominalDeal || 0), 0);
 
-    const openPipeline = deals
-      .filter(d => d.hasil === 'Lead' || d.hasil === 'Coordinating')
-      .reduce((sum, d) => sum + (d.estimasiNilai || 0), 0);
+    // nilai invoiced = nominal closing yang direferensikan oleh baris Generate
+    const closingByCode = {};
+    closedRows.forEach(r => { if (r.kodeDeal) closingByCode[r.kodeDeal] = r; });
+
+    const invoicedRevenue = invoiceRows.reduce((sum, r) => {
+      const closing = closingByCode[r.referensiClosing];
+      return sum + (closing ? (closing.nominalDeal || 0) : 0);
+    }, 0);
+
+    const referencedLeadCodes = new Set(
+      closedRows.map(r => r.referensiLead).filter(Boolean)
+    );
+
+    const openPipeline = rows
+      .filter(r => r.hasil === 'Lead' && r.kodeDeal && !referencedLeadCodes.has(r.kodeDeal))
+      .reduce((sum, r) => sum + (r.estimasiNilai || 0), 0);
 
     const annualTarget = targets.reduce((sum, t) => sum + t.target, 0);
-    const pct = annualTarget > 0 ? Math.min(100, (realized / annualTarget) * 100) : 0;
+    // Target dihitung dari Invoiced Revenue, sesuai aturan perusahaan: kinerja baru diakui manajemen
+    // setelah invoice terbit, bukan cuma saat MO ditandatangani.
+    const pct = annualTarget > 0 ? Math.min(100, (invoicedRevenue / annualTarget) * 100) : 0;
 
-    // realized per bulan, berdasarkan tanggal baris closing terakhir tiap deal
-    const realizedByMonth = {};
-    closedDeals.forEach(d => {
-      // cari tanggal closing dari baris asli (rows), karena objek deal hasil grouping tidak simpan tanggal
-      const matchingRow = allRows.find(r => r.klien === d.klien && r.project === d.project && r.fu === d.fu);
-      const bulan = matchingRow ? getMonthFromTanggal(matchingRow.tanggal) : null;
+    // invoiced per bulan, berdasarkan tanggal baris Generate (tanggal invoice terbit)
+    const invoicedByMonth = {};
+    invoiceRows.forEach(r => {
+      const closing = closingByCode[r.referensiClosing];
+      if (!closing) return;
+      const bulan = getMonthFromTanggal(r.tanggal);
       if (bulan) {
-        realizedByMonth[bulan] = (realizedByMonth[bulan] || 0) + (d.nominalDeal || 0);
+        invoicedByMonth[bulan] = (invoicedByMonth[bulan] || 0) + (closing.nominalDeal || 0);
       }
     });
 
     let monthGridHtml = '<div class="month-grid">';
     targets.forEach(t => {
-      const realizedMonth = realizedByMonth[t.bulan] || 0;
-      const monthPct = t.target > 0 ? Math.min(100, (realizedMonth / t.target) * 100) : 0;
-      const overClass = realizedMonth >= t.target && t.target > 0 ? 'over' : '';
+      const invoicedMonth = invoicedByMonth[t.bulan] || 0;
+      const monthPct = t.target > 0 ? Math.min(100, (invoicedMonth / t.target) * 100) : 0;
+      const overClass = invoicedMonth >= t.target && t.target > 0 ? 'over' : '';
       monthGridHtml += `
         <div class="month-box">
           <div class="month-name">${t.label}</div>
           <div class="month-track"><div class="month-fill ${overClass}" style="width:${monthPct}%"></div></div>
           <div class="month-nums">
-            <span class="realized">${formatRupiah(realizedMonth)}</span><br>
+            <span class="realized">${formatRupiah(invoicedMonth)}</span><br>
             <span class="target">/ ${formatRupiah(t.target)}</span>
           </div>
         </div>`;
@@ -228,8 +242,12 @@
       <div class="card">
         <div class="value-grid">
           <div class="stat-box realized">
-            <div class="label">Realized Revenue</div>
-            <div class="num">${formatRupiah(realized)}</div>
+            <div class="label">Invoiced Revenue (diakui manajemen)</div>
+            <div class="num">${formatRupiah(invoicedRevenue)}</div>
+          </div>
+          <div class="stat-box" style="border-color:#3d4452;">
+            <div class="label">MO Signed (belum invoice)</div>
+            <div class="num">${formatRupiah(moSigned - invoicedRevenue)}</div>
           </div>
           <div class="stat-box open">
             <div class="label">Open Pipeline (Estimasi)</div>
@@ -243,26 +261,20 @@
         <div class="progress-track">
           <div class="progress-fill" style="width:${pct}%"></div>
         </div>
-        <div class="progress-label">${pct.toFixed(1)}% dari target tahunan tercapai (realized only)</div>
+        <div class="progress-label">${pct.toFixed(1)}% dari target tahunan tercapai (berdasarkan invoice terbit, sesuai aturan perusahaan)</div>
         ${monthGridHtml}
       </div>`;
   }
 
-  function renderSalesPerformance(rows, deals) {
+  function renderSalesPerformance(rows) {
     const salesMap = {};
 
     rows.forEach(r => {
       if (!r.sales) return;
-      if (!salesMap[r.sales]) salesMap[r.sales] = { activities: 0, dealKeys: new Set(), closedKeys: new Set() };
+      if (!salesMap[r.sales]) salesMap[r.sales] = { activities: 0, engaged: 0, closed: 0 };
       salesMap[r.sales].activities++;
-    });
-
-    deals.forEach(d => {
-      if (!d.sales) return;
-      if (!salesMap[d.sales]) salesMap[d.sales] = { activities: 0, dealKeys: new Set(), closedKeys: new Set() };
-      const key = d.klien + '||' + d.project;
-      salesMap[d.sales].dealKeys.add(key);
-      if (d.hasil === 'Closing/Dealing') salesMap[d.sales].closedKeys.add(key);
+      if (r.hasil !== '1st Meet') salesMap[r.sales].engaged++;
+      if (r.hasil === 'Closing/Dealing') salesMap[r.sales].closed++;
     });
 
     const names = Object.keys(salesMap).sort();
@@ -273,17 +285,15 @@
     let rowsHtml = '';
     names.forEach(name => {
       const s = salesMap[name];
-      const totalDeals = s.dealKeys.size;
-      const closed = s.closedKeys.size;
-      const rate = totalDeals > 0 ? (closed / totalDeals) * 100 : 0;
+      const rate = s.activities > 0 ? (s.closed / s.activities) * 100 : 0;
       const rateClass = rate >= 30 ? 'rate-good' : rate >= 10 ? 'rate-mid' : 'rate-low';
 
       rowsHtml += `
         <tr>
           <td>${name}</td>
           <td class="num">${s.activities}</td>
-          <td class="num">${totalDeals}</td>
-          <td class="num">${closed}</td>
+          <td class="num">${s.engaged}</td>
+          <td class="num">${s.closed}</td>
           <td class="num ${rateClass}">${rate.toFixed(0)}%</td>
         </tr>`;
     });
@@ -295,7 +305,7 @@
             <tr>
               <th>Sales</th>
               <th style="text-align:right;">Aktivitas</th>
-              <th style="text-align:right;">Total Deal</th>
+              <th style="text-align:right;">Lead/Coordinating/Closing</th>
               <th style="text-align:right;">Closing</th>
               <th style="text-align:right;">Closing Rate</th>
             </tr>
@@ -327,7 +337,7 @@
 
       if (data.status !== 'success') throw new Error(data.message || 'Gagal ambil data');
 
-      const rows = data.rows || [];
+      const rows = cleanRows(data.rows || []);
       const targets = (targetData.targets && targetData.targets.length === 12)
         ? targetData.targets
         : Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, label: 'Bulan ' + (i + 1), target: 0 }));
@@ -338,20 +348,18 @@
         return;
       }
 
-      const deals = groupIntoDeals(rows);
-
       content.innerHTML = `
         <section>
           <h2>Pipeline Value vs Target</h2>
-          ${renderValueVsTarget(deals, rows, targets)}
+          ${renderValueVsTarget(rows, targets)}
         </section>
         <section>
           <h2>Funnel per Stage</h2>
-          ${renderFunnel(deals)}
+          ${renderFunnel(rows)}
         </section>
         <section>
           <h2>Performa Sales</h2>
-          ${renderSalesPerformance(rows, deals)}
+          ${renderSalesPerformance(rows)}
         </section>
       `;
 
@@ -365,6 +373,7 @@
 
   document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
   loadDashboard();
+  setInterval(loadDashboard, 60000); // auto-refresh tiap 1 menit
 </script>
 
 </body>
