@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Pipeline CRM</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #2a2e37;
+    --text: #e8e9ec;
+    --muted: #8b909c;
+    --accent: #4f7cff;
+    --success: #2fb673;
+    --warning: #d9a441;
+    --error: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 28px 16px 60px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  header { margin-bottom: 24px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: var(--muted); margin: 0; }
+  .refresh-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 8px;
+  }
+  .last-update { font-size: 12px; color: var(--muted); }
+  .refresh-btn {
+    font-size: 12px; padding: 7px 14px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+    cursor: pointer;
+  }
+  .refresh-btn:hover { border-color: var(--accent); }
+  .nav-link {
+    font-size: 12px; color: var(--accent); text-decoration: none;
+  }
+  .nav-link:hover { text-decoration: underline; }
+  section { margin-bottom: 28px; }
+  section h2 {
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em; margin: 0 0 12px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+
+  /* Value vs target */
+  .value-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px; margin-bottom: 16px;
+  }
+  .stat-box {
+    background: #1d212a; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-box .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .stat-box .num { font-size: 19px; font-weight: 700; }
+  .stat-box.realized .num { color: var(--success); }
+  .stat-box.open .num { color: var(--warning); }
+  .progress-track {
+    height: 10px; background: #1d212a; border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .progress-fill { height: 100%; background: var(--success); transition: width .3s; }
+  .progress-label { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  .month-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px; margin-top: 16px;
+  }
+  .month-box {
+    background: #1d212a; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .month-box .month-name { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .month-box .month-track { height: 6px; background: #0f1115; border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+  .month-box .month-fill { height: 100%; background: var(--accent); }
+  .month-box .month-fill.over { background: var(--success); }
+  .month-box .month-nums { font-size: 11px; color: var(--text); }
+  .month-box .month-nums .realized { font-weight: 700; }
+  .month-box .month-nums .target { color: var(--muted); }
+
+  /* Funnel */
+  .funnel-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .funnel-label { width: 110px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .funnel-bar-track { flex: 1; background: #1d212a; border-radius: 6px; overflow: hidden; height: 22px; border: 1px solid var(--border); }
+  .funnel-bar-fill { height: 100%; background: var(--accent); display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; transition: width .3s; }
+  .funnel-bar-fill span { font-size: 11px; font-weight: 600; color: white; }
+
+  /* Sales performance */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rate-good { color: var(--success); font-weight: 600; }
+  .rate-mid { color: var(--warning); font-weight: 600; }
+  .rate-low { color: var(--muted); }
+
+  .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
+  .error-state { text-align: center; color: var(--error); font-size: 13px; padding: 40px 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Dashboard Pipeline</h1>
+    <p class="subtitle">Data live dari Google Sheets &middot; auto-refresh tiap 1 menit</p>
+    <a class="nav-link" href="index.html">&larr; Kembali ke Input Pipeline</a>
+  </header>
+
+  <div class="refresh-row">
+    <span class="last-update" id="lastUpdate">Memuat data...</span>
+    <button class="refresh-btn" id="refreshBtn">Refresh</button>
+  </div>
+
+  <div id="dashboardContent">
+    <div class="empty-state">Memuat data...</div>
+  </div>
+</div>
+
+<script>
+  // GANTI dengan URL Web App Apps Script yang sama dengan landing page
+  const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzyrJ35iubKPtiMY7GEWGy1klnJPaa_rH1sL1ntg9l3Zq8JjkLcMaK59g9chBHAocGY/exec';
+
+  const STAGE_ORDER = ['1st Meet', 'Lead', 'Coordinating', 'Closing/Dealing', 'Generate'];
+
+  function formatRupiah(num) {
+    return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+  }
+
+  const VALID_STAGES = ['1st Meet', 'Lead', 'Coordinating', 'Closing/Dealing', 'Generate'];
+
+  function cleanRows(rows) {
+    // buang baris sampah/test yang tidak punya Hasil valid
+    return rows.filter(r => VALID_STAGES.includes(r.hasil));
+  }
+
+  const STAGE_LABELS = { 'Generate': 'Invoice Terbit' };
+
+  function renderFunnel(rows) {
+    const counts = {};
+    STAGE_ORDER.forEach(s => counts[s] = 0);
+    rows.forEach(r => {
+      if (counts.hasOwnProperty(r.hasil)) counts[r.hasil]++;
+    });
+    const max = Math.max(1, ...Object.values(counts));
+
+    let html = '<div class="card">';
+    STAGE_ORDER.forEach(stage => {
+      const val = counts[stage];
+      const pct = Math.max(6, (val / max) * 100);
+      const label = STAGE_LABELS[stage] || stage;
+      html += `
+        <div class="funnel-row">
+          <div class="funnel-label">${label}</div>
+          <div class="funnel-bar-track">
+            <div class="funnel-bar-fill" style="width:${pct}%">
+              <span>${val}</span>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function getMonthFromTanggal(tanggalStr) {
+    // format dari backend: yyyy-MM-dd
+    if (!tanggalStr) return null;
+    const parts = String(tanggalStr).split('-');
+    if (parts.length < 2) return null;
+    return Number(parts[1]); // 1-12
+  }
+
+  function renderValueVsTarget(rows, targets) {
+    const closedRows = rows.filter(r => r.hasil === 'Closing/Dealing');
+    const invoiceRows = rows.filter(r => r.hasil === 'Generate');
+
+    const moSigned = closedRows.reduce((sum, r) => sum + (r.nominalDeal || 0), 0);
+
+    // nilai invoiced = nominal closing yang direferensikan oleh baris Generate
+    const closingByCode = {};
+    closedRows.forEach(r => { if (r.kodeDeal) closingByCode[r.kodeDeal] = r; });
+
+    const invoicedRevenue = invoiceRows.reduce((sum, r) => {
+      const closing = closingByCode[r.referensiClosing];
+      return sum + (closing ? (closing.nominalDeal || 0) : 0);
+    }, 0);
+
+    const referencedLeadCodes = new Set(
+      closedRows.map(r => r.referensiLead).filter(Boolean)
+    );
+
+    const openPipeline = rows
+      .filter(r => r.hasil === 'Lead' && r.kodeDeal && !referencedLeadCodes.has(r.kodeDeal))
+      .reduce((sum, r) => sum + (r.estimasiNilai || 0), 0);
+
+    const annualTarget = targets.reduce((sum, t) => sum + t.target, 0);
+    // Target dihitung dari Invoiced Revenue, sesuai aturan perusahaan: kinerja baru diakui manajemen
+    // setelah invoice terbit, bukan cuma saat MO ditandatangani.
+    const pct = annualTarget > 0 ? Math.min(100, (invoicedRevenue / annualTarget) * 100) : 0;
+
+    // invoiced per bulan, berdasarkan tanggal baris Generate (tanggal invoice terbit)
+    const invoicedByMonth = {};
+    invoiceRows.forEach(r => {
+      const closing = closingByCode[r.referensiClosing];
+      if (!closing) return;
+      const bulan = getMonthFromTanggal(r.tanggal);
+      if (bulan) {
+        invoicedByMonth[bulan] = (invoicedByMonth[bulan] || 0) + (closing.nominalDeal || 0);
+      }
+    });
+
+    let monthGridHtml = '<div class="month-grid">';
+    targets.forEach(t => {
+      const invoicedMonth = invoicedByMonth[t.bulan] || 0;
+      const monthPct = t.target > 0 ? Math.min(100, (invoicedMonth / t.target) * 100) : 0;
+      const overClass = invoicedMonth >= t.target && t.target > 0 ? 'over' : '';
+      monthGridHtml += `
+        <div class="month-box">
+          <div class="month-name">${t.label}</div>
+          <div class="month-track"><div class="month-fill ${overClass}" style="width:${monthPct}%"></div></div>
+          <div class="month-nums">
+            <span class="realized">${formatRupiah(invoicedMonth)}</span><br>
+            <span class="target">/ ${formatRupiah(t.target)}</span>
+          </div>
+        </div>`;
+    });
+    monthGridHtml += '</div>';
+
+    return `
+      <div class="card">
+        <div class="value-grid">
+          <div class="stat-box realized">
+            <div class="label">Invoiced Revenue (diakui manajemen)</div>
+            <div class="num">${formatRupiah(invoicedRevenue)}</div>
+          </div>
+          <div class="stat-box" style="border-color:#3d4452;">
+            <div class="label">MO Signed (belum invoice)</div>
+            <div class="num">${formatRupiah(moSigned - invoicedRevenue)}</div>
+          </div>
+          <div class="stat-box open">
+            <div class="label">Open Pipeline (Estimasi)</div>
+            <div class="num">${formatRupiah(openPipeline)}</div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Target Tahunan</div>
+            <div class="num">${formatRupiah(annualTarget)}</div>
+          </div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="progress-label">${pct.toFixed(1)}% dari target tahunan tercapai (berdasarkan invoice terbit, sesuai aturan perusahaan)</div>
+        ${monthGridHtml}
+      </div>`;
+  }
+
+  function renderSalesPerformance(rows) {
+    const salesMap = {};
+
+    rows.forEach(r => {
+      if (!r.sales) return;
+      if (!salesMap[r.sales]) salesMap[r.sales] = { activities: 0, engaged: 0, closed: 0 };
+      salesMap[r.sales].activities++;
+      if (r.hasil !== '1st Meet') salesMap[r.sales].engaged++;
+      if (r.hasil === 'Closing/Dealing') salesMap[r.sales].closed++;
+    });
+
+    const names = Object.keys(salesMap).sort();
+    if (names.length === 0) {
+      return '<div class="card"><div class="empty-state">Belum ada data sales.</div></div>';
+    }
+
+    let rowsHtml = '';
+    names.forEach(name => {
+      const s = salesMap[name];
+      const rate = s.activities > 0 ? (s.closed / s.activities) * 100 : 0;
+      const rateClass = rate >= 30 ? 'rate-good' : rate >= 10 ? 'rate-mid' : 'rate-low';
+
+      rowsHtml += `
+        <tr>
+          <td>${name}</td>
+          <td class="num">${s.activities}</td>
+          <td class="num">${s.engaged}</td>
+          <td class="num">${s.closed}</td>
+          <td class="num ${rateClass}">${rate.toFixed(0)}%</td>
+        </tr>`;
+    });
+
+    return `
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Sales</th>
+              <th style="text-align:right;">Aktivitas</th>
+              <th style="text-align:right;">Lead/Coordinating/Closing</th>
+              <th style="text-align:right;">Closing</th>
+              <th style="text-align:right;">Closing Rate</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+  }
+
+  async function loadDashboard() {
+    const content = document.getElementById('dashboardContent');
+    const lastUpdate = document.getElementById('lastUpdate');
+
+    if (WEBAPP_URL.indexOf('PASTE_URL') !== -1) {
+      content.innerHTML = '<div class="error-state">WEBAPP_URL belum diisi di kode dashboard ini.</div>';
+      lastUpdate.textContent = 'Belum terkonfigurasi';
+      return;
+    }
+
+    lastUpdate.textContent = 'Memuat...';
+
+    try {
+      const [dashRes, targetRes] = await Promise.all([
+        fetch(WEBAPP_URL + '?action=dashboardData'),
+        fetch(WEBAPP_URL + '?action=targetRevenue')
+      ]);
+      const data = await dashRes.json();
+      const targetData = await targetRes.json();
+
+      if (data.status !== 'success') throw new Error(data.message || 'Gagal ambil data');
+
+      const rows = cleanRows(data.rows || []);
+      const targets = (targetData.targets && targetData.targets.length === 12)
+        ? targetData.targets
+        : Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, label: 'Bulan ' + (i + 1), target: 0 }));
+
+      if (rows.length === 0) {
+        content.innerHTML = '<div class="empty-state">Belum ada data pipeline masuk.</div>';
+        lastUpdate.textContent = 'Terakhir dicek: ' + new Date().toLocaleTimeString('id-ID');
+        return;
+      }
+
+      content.innerHTML = `
+        <section>
+          <h2>Pipeline Value vs Target</h2>
+          ${renderValueVsTarget(rows, targets)}
+        </section>
+        <section>
+          <h2>Funnel per Stage</h2>
+          ${renderFunnel(rows)}
+        </section>
+        <section>
+          <h2>Performa Sales</h2>
+          ${renderSalesPerformance(rows)}
+        </section>
+      `;
+
+      lastUpdate.textContent = 'Terakhir dicek: ' + new Date().toLocaleTimeString('id-ID');
+
+    } catch (err) {
+      content.innerHTML = '<div class="error-state">Gagal memuat data: ' + err.message + '</div>';
+      lastUpdate.textContent = 'Gagal memuat';
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+  loadDashboard();
+  setInterval(loadDashboard, 60000); // auto-refresh tiap 1 menit
+</script>
+
+</body>
+</html>
