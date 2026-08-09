@@ -165,6 +165,17 @@
         <div class="option-btn" data-value="Lead">Lead</div>
         <div class="option-btn" data-value="Coordinating">Coordinating</div>
         <div class="option-btn" data-value="Closing/Dealing">Closing/Dealing</div>
+        <div class="option-btn" data-value="Generate">Invoice Terbit</div>
+      </div>
+
+      <div class="conditional-field" id="invoiceField">
+        <label for="referensiClosing">Invoice ini untuk Closing yang mana?</label>
+        <select id="referensiClosing">
+          <option value="">-- pilih closing --</option>
+        </select>
+
+        <label for="nomorInvoice" style="margin-top:12px;">Nomor Invoice (opsional)</label>
+        <input type="text" id="nomorInvoice" placeholder="INV/2026/001">
       </div>
 
       <div class="conditional-field" id="estimasiField">
@@ -188,6 +199,11 @@
             <span>Rp</span>
             <input type="text" id="nominalDeal" placeholder="0" inputmode="numeric">
           </div>
+
+          <label for="referensiLead" style="margin-top:12px;">Deal ini dari Lead yang mana?</label>
+          <select id="referensiLead">
+            <option value="">Bukan dari Lead manapun (closing langsung)</option>
+          </select>
         </div>
       </div>
     </div>
@@ -267,10 +283,53 @@
   loadClientList();
 
   // ---- Saat klien dipilih, cek riwayat ----
+  async function loadOpenClosingsForClient(klien) {
+    const select = document.getElementById('referensiClosing');
+    select.innerHTML = '<option value="">-- pilih closing --</option>';
+    if (!klien || WEBAPP_URL.indexOf('PASTE_URL') !== -1) return;
+
+    try {
+      const res = await fetch(WEBAPP_URL + '?action=openClosings&klien=' + encodeURIComponent(klien));
+      const data = await res.json();
+      (data.closings || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.kodeDeal;
+        const nom = 'Rp ' + Math.round(c.nominalDeal).toLocaleString('id-ID');
+        const ket = c.keterangan ? (' - ' + c.keterangan) : '';
+        opt.textContent = nom + ket + ' (' + c.tanggal + ')';
+        select.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Gagal load open closings', err);
+    }
+  }
+
+  async function loadOpenLeadsForClient(klien) {
+    const select = document.getElementById('referensiLead');
+    select.innerHTML = '<option value="">Bukan dari Lead manapun (closing langsung)</option>';
+    if (!klien || WEBAPP_URL.indexOf('PASTE_URL') !== -1) return;
+
+    try {
+      const res = await fetch(WEBAPP_URL + '?action=openLeads&klien=' + encodeURIComponent(klien));
+      const data = await res.json();
+      (data.leads || []).forEach(lead => {
+        const opt = document.createElement('option');
+        opt.value = lead.kodeDeal;
+        const est = lead.estimasiNilai ? ('Rp ' + Math.round(lead.estimasiNilai).toLocaleString('id-ID')) : 'Rp 0';
+        const ket = lead.keterangan ? (' - ' + lead.keterangan) : '';
+        opt.textContent = est + ket + ' (' + lead.tanggal + ')';
+        select.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Gagal load open leads', err);
+    }
+  }
+
   document.getElementById('klien').addEventListener('change', async (e) => {
     const klien = e.target.value;
     const infoBox = document.getElementById('clientInfoBox');
     resetTujuanHasilUI();
+    loadOpenLeadsForClient(klien);
 
     if (!klien) {
       infoBox.classList.remove('show');
@@ -319,6 +378,8 @@
     document.getElementById('dealField').classList.remove('show');
     document.getElementById('nominalWrap').style.display = 'block';
     document.getElementById('estimasiField').classList.remove('show');
+    document.getElementById('invoiceField').classList.remove('show');
+    document.getElementById('nomorInvoice').value = '';
     document.getElementById('keteranganField').classList.remove('show');
     document.getElementById('keterangan').value = '';
     document.getElementById('projectFuField').style.display = 'none';
@@ -371,6 +432,14 @@
           } else {
             dealField.classList.remove('show');
             document.getElementById('nominalDeal').value = '';
+          }
+
+          if (btn.dataset.value === 'Generate') {
+            document.getElementById('invoiceField').classList.add('show');
+            const klienNow = document.getElementById('klien').value;
+            loadOpenClosingsForClient(klienNow);
+          } else {
+            document.getElementById('invoiceField').classList.remove('show');
           }
 
           if (btn.dataset.value === 'Lead') {
@@ -427,6 +496,11 @@
       statusMsg.textContent = 'Pilih status Deal atau No Deal.';
       return;
     }
+    if (state.hasil === 'Generate' && !document.getElementById('referensiClosing').value) {
+      statusMsg.className = 'status-msg error';
+      statusMsg.textContent = 'Pilih closing yang di-invoice-kan.';
+      return;
+    }
     if (WEBAPP_URL.indexOf('PASTE_URL') !== -1) {
       statusMsg.className = 'status-msg error';
       statusMsg.textContent = 'WEBAPP_URL belum diisi. Deploy Apps Script dulu, lalu tempel URL-nya di kode.';
@@ -434,10 +508,12 @@
     }
 
     let nominalDealValue = '';
+    let referensiLeadValue = '';
     if (state.hasil === 'Closing/Dealing') {
       nominalDealValue = state.closingStatus === 'No Deal'
         ? '0'
         : document.getElementById('nominalDeal').value.trim();
+      referensiLeadValue = document.getElementById('referensiLead').value;
     }
 
     const payload = {
@@ -450,6 +526,13 @@
       project: state.project,
       fu: state.fu,
       nominalDeal: nominalDealValue,
+      referensiLead: referensiLeadValue,
+      referensiClosing: state.hasil === 'Generate'
+        ? document.getElementById('referensiClosing').value
+        : '',
+      nomorInvoice: state.hasil === 'Generate'
+        ? document.getElementById('nomorInvoice').value.trim()
+        : '',
       estimasiNilai: state.hasil === 'Lead'
         ? document.getElementById('estimasiNilai').value.trim()
         : ''
