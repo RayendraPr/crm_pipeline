@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credit - CRM Pipeline</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #2a2e37;
+    --text: #e8e9ec;
+    --muted: #8b909c;
+    --accent: #4f7cff;
+    --success: #2fb673;
+    --warning: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 26px 32px;
+  }
+  h1 { font-size: 19px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .nav-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+  .nav-link:hover { text-decoration: underline; }
+  .nav-current { font-size: 12px; color: var(--text); font-weight: 600; }
+
+  section { margin-bottom: 20px; }
+  section h2 {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em; margin: 0 0 8px;
+  }
+  .info-box {
+    background: #1d212a; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; font-size: 13px; line-height: 1.6;
+  }
+  .tech-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tech-tag {
+    font-size: 11px; padding: 4px 10px; border-radius: 20px;
+    background: #1d212a; border: 1px solid var(--border); color: var(--muted);
+  }
+
+  .changelog-item {
+    display: flex; gap: 10px; margin-bottom: 10px; font-size: 13px;
+  }
+  .changelog-version {
+    flex-shrink: 0; font-weight: 600; color: var(--accent); width: 44px;
+  }
+  .changelog-desc { color: var(--text); line-height: 1.5; }
+
+  .wa-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 12px; border-radius: 8px; border: none;
+    background: var(--success); color: white; font-size: 14px; font-weight: 600;
+    text-decoration: none;
+  }
+  .wa-btn:hover { opacity: 0.9; }
+
+  .disclaimer {
+    font-size: 12px; color: var(--warning); background: rgba(217,164,65,0.1);
+    border: 1px solid rgba(217,164,65,0.3); border-radius: 8px; padding: 10px 12px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>CRM Pipeline</h1>
+  <p class="subtitle">v1.3</p>
+  <div class="nav-row">
+    <a class="nav-link" href="index.html">Input Pipeline</a>
+    <a class="nav-link" href="dashboard.html">Dashboard</a>
+    <a class="nav-link" href="analytics.html">Analitik</a>
+    <span class="nav-current">Credit</span>
+  </div>
+
+  <section>
+    <h2>Dibuat Oleh</h2>
+    <div class="info-box">Raye &middot; 11 Agustus 2026</div>
+  </section>
+
+  <section>
+    <h2>Dibangun Dengan</h2>
+    <div class="tech-tags">
+      <span class="tech-tag">Google Sheets</span>
+      <span class="tech-tag">Google Apps Script</span>
+      <span class="tech-tag">GitHub Pages</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Changelog</h2>
+    <div class="changelog-item">
+      <div class="changelog-version">v1.0</div>
+      <div class="changelog-desc">Rilis awal: form input pipeline (Klien, Sales, Tujuan, Hasil), dashboard funnel &amp; performa sales, target revenue bulanan editable.</div>
+    </div>
+    <div class="changelog-item">
+      <div class="changelog-version">v1.1</div>
+      <div class="changelog-desc">Siklus wajib Lead &rarr; Closing (Deal/No Deal) &rarr; Invoice Terbit, dengan referensi antar-tahap supaya tidak ada nilai dobel dihitung.</div>
+    </div>
+    <div class="changelog-item">
+      <div class="changelog-version">v1.2</div>
+      <div class="changelog-desc">Pemisahan MO Signed vs Invoiced Revenue (sesuai aturan pengakuan kinerja perusahaan), nomor invoice otomatis.</div>
+    </div>
+    <div class="changelog-item">
+      <div class="changelog-version">v1.3</div>
+      <div class="changelog-desc">Dropdown Layanan, auto-expiry 1st Meet (7 hari) &amp; Lead (30 hari), halaman Analitik (Brand/Layanan x Nilai &amp; Ongoing Lead), grafik pendapatan bulanan.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kontak / Support</h2>
+    <p style="font-size:13px; color:var(--muted); margin:0 0 10px;">Mau ngobrol soal bug, request fitur, atau ada yang error? Chat di sini:</p>
+    <a class="wa-btn" href="https://wa.me/6285742173017" target="_blank" rel="noopener">Chat via WhatsApp</a>
+  </section>
+
+  <section style="margin-bottom:0;">
+    <div class="disclaimer">Khusus internal &mdash; jangan disebar ke luar tim.</div>
+  </section>
+</div>
+
+</body>
+</html>
