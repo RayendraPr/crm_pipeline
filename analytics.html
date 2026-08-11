@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analitik Pipeline CRM</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #2a2e37;
+    --text: #e8e9ec;
+    --muted: #8b909c;
+    --accent: #4f7cff;
+    --success: #2fb673;
+    --warning: #d9a441;
+    --error: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 28px 16px 60px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  header { margin-bottom: 24px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: var(--muted); margin: 0; }
+  .nav-row { display: flex; gap: 14px; margin-top: 6px; flex-wrap: wrap; }
+  .nav-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+  .nav-link:hover { text-decoration: underline; }
+  .nav-current { font-size: 12px; color: var(--text); font-weight: 600; }
+  .refresh-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 8px;
+  }
+  .last-update { font-size: 12px; color: var(--muted); }
+  .refresh-btn {
+    font-size: 12px; padding: 7px 14px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+    cursor: pointer;
+  }
+  .refresh-btn:hover { border-color: var(--accent); }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab-btn {
+    font-size: 13px; padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--muted);
+    cursor: pointer;
+  }
+  .tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+  section { margin-bottom: 28px; }
+  section h2 {
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em; margin: 0 0 12px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+
+  .breakdown-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .breakdown-label {
+    width: 150px; font-size: 12px; color: var(--text); flex-shrink: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .breakdown-bar-track { flex: 1; background: #1d212a; border-radius: 6px; overflow: hidden; height: 24px; border: 1px solid var(--border); }
+  .breakdown-bar-fill {
+    height: 100%; display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 8px; transition: width .3s;
+  }
+  .breakdown-bar-fill.value { background: var(--success); }
+  .breakdown-bar-fill.lead { background: var(--warning); }
+  .breakdown-bar-fill span { font-size: 11px; font-weight: 600; color: #0f1115; }
+
+  .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; }
+  .error-state { text-align: center; color: var(--error); font-size: 13px; padding: 40px 0; }
+
+  .monthly-chart {
+    display: flex; align-items: flex-end; gap: 8px;
+    height: 180px; padding: 10px 4px 0;
+  }
+  .monthly-col {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    height: 100%; justify-content: flex-end; gap: 6px;
+  }
+  .monthly-bar-track {
+    width: 100%; flex: 1; display: flex; align-items: flex-end;
+    background: #1d212a; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .monthly-bar-fill {
+    width: 100%; background: var(--success); border-radius: 4px 4px 0 0; transition: height .3s;
+    min-height: 2px;
+  }
+  .monthly-val { font-size: 9px; color: var(--muted); text-align: center; line-height: 1.3; }
+  .monthly-label { font-size: 10px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Analitik Pipeline</h1>
+    <p class="subtitle">Breakdown Brand &amp; Layanan &middot; auto-refresh tiap 1 menit</p>
+    <div class="nav-row">
+      <a class="nav-link" href="index.html">Input Pipeline</a>
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <span class="nav-current">Analitik</span>
+    </div>
+  </header>
+
+  <div class="refresh-row">
+    <span class="last-update" id="lastUpdate">Memuat data...</span>
+    <button class="refresh-btn" id="refreshBtn">Refresh</button>
+  </div>
+
+  <section>
+    <h2>Pendapatan per Bulan (Invoiced Revenue)</h2>
+    <div id="monthlyChart">
+      <div class="empty-state">Memuat data...</div>
+    </div>
+  </section>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-view="brandNilai">Brand x Nilai</button>
+    <button class="tab-btn" data-view="layananNilai">Layanan x Nilai</button>
+    <button class="tab-btn" data-view="brandLead">Brand Ongoing Lead</button>
+    <button class="tab-btn" data-view="layananLead">Layanan Ongoing Lead</button>
+  </div>
+
+  <div id="content">
+    <div class="empty-state">Memuat data...</div>
+  </div>
+</div>
+
+<script>
+  const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzyrJ35iubKPtiMY7GEWGy1klnJPaa_rH1sL1ntg9l3Zq8JjkLcMaK59g9chBHAocGY/exec';
+
+  const EXPIRY_LEAD_DAYS = 30;
+  const MAX_BARS = 10; // sisanya digabung jadi "Lainnya"
+
+  let allRows = [];
+  let currentView = 'brandNilai';
+
+  function formatRupiah(num) {
+    return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+  }
+
+  function daysSince(tanggalStr) {
+    if (!tanggalStr) return 999999;
+    const d = new Date(tanggalStr);
+    if (isNaN(d.getTime())) return 999999;
+    return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Telusuri rantai Invoice -> Closing -> Lead untuk dapat Layanan & Klien dari nilai yang sudah invoiced
+  function buildChainMaps(rows) {
+    const leadByCode = {};
+    const closingByCode = {};
+    rows.forEach(r => {
+      if (r.hasil === 'Lead' && r.kodeDeal) leadByCode[r.kodeDeal] = r;
+      if (r.hasil === 'Closing/Dealing' && r.kodeDeal) closingByCode[r.kodeDeal] = r;
+    });
+    return { leadByCode, closingByCode };
+  }
+
+  const MONTH_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+  function getMonthFromTanggal(tanggalStr) {
+    if (!tanggalStr) return null;
+    const d = new Date(tanggalStr);
+    if (isNaN(d.getTime())) return null;
+    return d.getMonth() + 1; // 1-12
+  }
+
+  function renderMonthlyRevenue(rows) {
+    const { closingByCode } = buildChainMaps(rows);
+    const byMonth = {};
+    for (let i = 1; i <= 12; i++) byMonth[i] = 0;
+
+    rows.filter(r => r.hasil === 'Generate').forEach(inv => {
+      const closing = closingByCode[inv.referensiClosing];
+      if (!closing) return;
+      const bulan = getMonthFromTanggal(inv.tanggal);
+      if (bulan) byMonth[bulan] += (closing.nominalDeal || 0);
+    });
+
+    const max = Math.max(1, ...Object.values(byMonth));
+    const container = document.getElementById('monthlyChart');
+
+    let html = '<div class="card"><div class="monthly-chart">';
+    for (let m = 1; m <= 12; m++) {
+      const val = byMonth[m];
+      const heightPct = Math.max(2, (val / max) * 100);
+      const valLabel = val > 0 ? (Math.round(val / 1000000) + 'jt') : '';
+      html += `
+        <div class="monthly-col">
+          <div class="monthly-val">${valLabel}</div>
+          <div class="monthly-bar-track">
+            <div class="monthly-bar-fill" style="height:${heightPct}%"></div>
+          </div>
+          <div class="monthly-label">${MONTH_SHORT[m - 1]}</div>
+        </div>`;
+    }
+    html += '</div></div>';
+    container.innerHTML = html;
+  }
+
+  function aggregateInvoicedByKey(rows, keyFn) {
+    const { leadByCode, closingByCode } = buildChainMaps(rows);
+    const map = {};
+    rows.filter(r => r.hasil === 'Generate').forEach(inv => {
+      const closing = closingByCode[inv.referensiClosing];
+      if (!closing) return;
+      const lead = leadByCode[closing.referensiLead];
+      const key = keyFn(closing, lead) || 'Tidak diketahui';
+      map[key] = (map[key] || 0) + (closing.nominalDeal || 0);
+    });
+    return map;
+  }
+
+  function aggregateOpenLeadsByKey(rows, keyFn) {
+    const referencedLeadCodes = new Set(
+      rows.filter(r => r.hasil === 'Closing/Dealing').map(r => r.referensiLead).filter(Boolean)
+    );
+    const map = {};
+    rows
+      .filter(r => r.hasil === 'Lead' && r.kodeDeal && !referencedLeadCodes.has(r.kodeDeal) && daysSince(r.tanggal) <= EXPIRY_LEAD_DAYS)
+      .forEach(r => {
+        const key = keyFn(r) || 'Tidak diketahui';
+        map[key] = (map[key] || 0) + (r.estimasiNilai || 0);
+      });
+    return map;
+  }
+
+  function renderBreakdown(map, barClass) {
+    let entries = Object.entries(map).filter(([k, v]) => v > 0);
+    entries.sort((a, b) => b[1] - a[1]);
+
+    if (entries.length === 0) {
+      return '<div class="card"><div class="empty-state">Belum ada data untuk ditampilkan.</div></div>';
+    }
+
+    if (entries.length > MAX_BARS) {
+      const top = entries.slice(0, MAX_BARS - 1);
+      const restSum = entries.slice(MAX_BARS - 1).reduce((s, [, v]) => s + v, 0);
+      entries = [...top, ['Lainnya', restSum]];
+    }
+
+    const max = Math.max(...entries.map(([, v]) => v));
+
+    let html = '<div class="card">';
+    entries.forEach(([label, val]) => {
+      const pct = Math.max(6, (val / max) * 100);
+      html += `
+        <div class="breakdown-row">
+          <div class="breakdown-label" title="${label}">${label}</div>
+          <div class="breakdown-bar-track">
+            <div class="breakdown-bar-fill ${barClass}" style="width:${pct}%">
+              <span>${formatRupiah(val)}</span>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function render() {
+    const content = document.getElementById('content');
+    let map, barClass, heading;
+
+    if (currentView === 'brandNilai') {
+      map = aggregateInvoicedByKey(allRows, (closing) => closing.klien);
+      barClass = 'value';
+      heading = 'Brand x Nilai (Invoiced Revenue)';
+    } else if (currentView === 'layananNilai') {
+      map = aggregateInvoicedByKey(allRows, (closing, lead) => lead ? lead.layanan : null);
+      barClass = 'value';
+      heading = 'Layanan x Nilai (Invoiced Revenue)';
+    } else if (currentView === 'brandLead') {
+      map = aggregateOpenLeadsByKey(allRows, (r) => r.klien);
+      barClass = 'lead';
+      heading = 'Brand x Ongoing Lead (Estimasi)';
+    } else {
+      map = aggregateOpenLeadsByKey(allRows, (r) => r.layanan);
+      barClass = 'lead';
+      heading = 'Layanan x Ongoing Lead (Estimasi)';
+    }
+
+    content.innerHTML = `
+      <section>
+        <h2>${heading}</h2>
+        ${renderBreakdown(map, barClass)}
+      </section>`;
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentView = btn.dataset.view;
+      render();
+    });
+  });
+
+  async function loadData() {
+    const lastUpdate = document.getElementById('lastUpdate');
+    const content = document.getElementById('content');
+
+    if (WEBAPP_URL.indexOf('PASTE_URL') !== -1) {
+      content.innerHTML = '<div class="error-state">WEBAPP_URL belum diisi di kode halaman ini.</div>';
+      lastUpdate.textContent = 'Belum terkonfigurasi';
+      return;
+    }
+
+    lastUpdate.textContent = 'Memuat...';
+
+    try {
+      const res = await fetch(WEBAPP_URL + '?action=dashboardData');
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || 'Gagal ambil data');
+
+      allRows = data.rows || [];
+      renderMonthlyRevenue(allRows);
+      render();
+      lastUpdate.textContent = 'Terakhir dicek: ' + new Date().toLocaleTimeString('id-ID');
+
+    } catch (err) {
+      content.innerHTML = '<div class="error-state">Gagal memuat data: ' + err.message + '</div>';
+      lastUpdate.textContent = 'Gagal memuat';
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', loadData);
+  loadData();
+  setInterval(loadData, 60000);
+</script>
+
+</body>
+</html>
